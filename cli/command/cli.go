@@ -155,9 +155,29 @@ func (cli *DockerCli) ServerInfo() ServerInfo {
 	return cli.serverInfo
 }
 
+var contentTrustWarningMutex = sync.Once{}
+
+const ContentTrustDeprecationWarning = "Docker Content Trust is deprecated, will be removed in the future, and is already partially ignored" // TODO a better dprecation notice?  add a link?
+
+func (cli *DockerCli) printContentTrustWarning() {
+	contentTrustWarningMutex.Do(func() {
+		var errOut io.Writer
+		if err := cli.Err(); err != nil {
+			errOut = err
+		} else {
+			// in case WithStandardStreams is invoked *after* WithContentTrustFromEnv, fall back to os.Stderr
+			errOut = os.Stderr
+		}
+		errOut.Write([]byte("WARNING: " + ContentTrustDeprecationWarning + "\n"))
+	})
+}
+
 // ContentTrustEnabled returns whether content trust has been enabled by an
 // environment variable.
 func (cli *DockerCli) ContentTrustEnabled() bool {
+	if cli.contentTrust {
+		cli.printContentTrustWarning()
+	}
 	return cli.contentTrust
 }
 
@@ -514,9 +534,9 @@ type ServerInfo struct {
 // environment.
 func NewDockerCli(ops ...CLIOption) (*DockerCli, error) {
 	defaultOps := []CLIOption{
-		WithContentTrustFromEnv(),
 		WithDefaultContextStoreConfig(),
 		WithStandardStreams(),
+		WithContentTrustFromEnv(), // order is important here because WithContentTrustFromEnv needs Err() which comes from WithStandardStreams
 	}
 	ops = append(defaultOps, ops...)
 

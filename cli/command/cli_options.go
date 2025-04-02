@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/docker/cli/cli/streams"
@@ -77,14 +76,14 @@ func WithErrorStream(err io.Writer) CLIOption {
 }
 
 // WithContentTrustFromEnv enables content trust on a cli from environment variable DOCKER_CONTENT_TRUST value.
+//
+// Deprecated: Docker Content Trust is itself deprecated, and will be removed entirely in the future.
 func WithContentTrustFromEnv() CLIOption {
 	return func(cli *DockerCli) error {
 		cli.contentTrust = false
-		if e := os.Getenv("DOCKER_CONTENT_TRUST"); e != "" {
-			if t, err := strconv.ParseBool(e); t || err != nil {
-				// treat any other value as true
-				cli.contentTrust = true
-			}
+		if _, set := os.LookupEnv("DOCKER_CONTENT_TRUST"); set {
+			cli.printContentTrustWarning()
+			// phase 1 of the deprecation is ignoring this variable (but warning if it's explicitly used)
 		}
 		return nil
 	}
